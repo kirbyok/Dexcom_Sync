@@ -154,8 +154,13 @@ class DexcomClient:
                         readings.append({
                             'timestamp': timestamp,
                             'value': record.get('Value', 0),
-                            'trend': record.get('Trend', 'Unknown'),  # Already a string from API
-                            'unit': 'mg/dL'
+                            'trend': record.get('Trend', 'Unknown'),  # String from API
+                            'unit': 'mg/dL',
+                            'trend_rate': record.get('TrendRate'),
+                            'filtered': record.get('Filtered'),
+                            'unfiltered': record.get('Unfiltered'),
+                            'rssi': record.get('Rssi'),
+                            'noise': record.get('Noise')
                         })
                     except Exception as e:
                         print(f"Error parsing reading: {e}")
