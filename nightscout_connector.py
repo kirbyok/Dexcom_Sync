@@ -9,8 +9,8 @@ class NightscoutConnector:
     def __init__(self, url: str, api_token: str):
         self.url = url.rstrip('/')
         self.api_token = api_token
-        # Allow overriding device name via env (fallback to DexSync)
-        self.device_name = os.getenv('DEXCOM_DEVICE_NAME', 'DexSync')
+        # Allow overriding device name via env (fallback to Dexcom)
+        self.device_name = os.getenv('DEXCOM_DEVICE_NAME', 'Dexcom')
         self.session = requests.Session()
         self.session.headers.update({
             'api-secret': api_token,

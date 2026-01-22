@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Dexcom Sync - Simple CLI tool to sync Dexcom glucose readings to Nightscout
-Similar to Tconnectsync architecture
+Note: Glooko Omnipod sync runs in a separate container (glooko_main.py)
 """
 
 import os
@@ -56,17 +56,20 @@ def setup_logging():
 logger = setup_logging()
 
 class DexcomSync:
-    """Main sync manager"""
+    """Main sync manager for Dexcom CGM data only"""
     
     def __init__(self):
         self.dexcom = DexcomClient()
         self.nightscout = None
         
-        # Initialize Nightscout if configured
+        # Initialize Nightscout for CGM data if configured
         ns_url = os.getenv('NIGHTSCOUT_URL')
         ns_token = os.getenv('NIGHTSCOUT_API_TOKEN')
         if ns_url and ns_token:
             self.nightscout = NightscoutConnector(ns_url, ns_token)
+            logger.info("Nightscout CGM connector initialized")
+        else:
+            logger.info("Nightscout not configured")
     
     def display_readings(self, readings: List[Dict[str, Any]]):
         """Display the last N readings in a nice format"""
@@ -161,12 +164,35 @@ class DexcomSync:
             
             # Push to Nightscout if configured
             if self.nightscout:
-                logger.info("Pushing to Nightscout...")
+                logger.info("Checking for new readings to push to Nightscout...")
+                
+                # Get latest reading from Nightscout to avoid duplicates
+                latest_ns_reading = self.nightscout.get_latest_reading()
+                if latest_ns_reading:
+                    latest_ns_time = latest_ns_reading['timestamp']
+                    logger.info(f"Latest Nightscout reading: {latest_ns_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    # Filter to only new readings after the latest in Nightscout
+                    new_readings = [
+                        r for r in readings 
+                        if r['timestamp'] > latest_ns_time
+                    ]
+                    
+                    if not new_readings:
+                        logger.info("[OK] No new readings to push (all already in Nightscout)")
+                        return True
+                    
+                    logger.info(f"Found {len(new_readings)} new reading(s) to push")
+                else:
+                    logger.info("No existing readings in Nightscout, pushing all")
+                    new_readings = readings
+                
+                # Push only new readings
                 success_count = 0
-                for reading in readings:
+                for reading in new_readings:
                     if self.nightscout.push_reading(reading):
                         success_count += 1
-                logger.info(f"[OK] Pushed {success_count}/{len(readings)} readings to Nightscout")
+                logger.info(f"[OK] Pushed {success_count}/{len(new_readings)} readings to Nightscout")
             else:
                 logger.debug("Nightscout not configured (set NIGHTSCOUT_URL and NIGHTSCOUT_API_TOKEN)")
             
@@ -178,11 +204,12 @@ class DexcomSync:
             return False
     
     def run_continuous(self):
-        """Run continuous syncing"""
+        """Run continuous syncing for Dexcom CGM"""
         import time
         
         interval = int(os.getenv('SYNC_INTERVAL_MINUTES', '3')) * 60
-        logger.info(f"Starting continuous sync every {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
+        logger.info(f"Starting continuous Dexcom CGM sync every {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
+        logger.info("Note: Glooko Omnipod sync runs in a separate container")
         logger.info("Press Ctrl+C to stop.\n")
         
         try:
