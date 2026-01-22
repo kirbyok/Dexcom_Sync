@@ -1,7 +1,6 @@
 import requests
-import os
-from datetime import datetime, timezone
-from typing import Dict
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 class NightscoutConnector:
     """Connector for Nightscout API"""
@@ -15,14 +14,15 @@ class NightscoutConnector:
             'Content-Type': 'application/json'
         })
     
-    def push_reading(self, reading: Dict) -> bool:
+    def push_reading(self, reading: Dict[str, Any]) -> bool:
         """Push a glucose reading to Nightscout"""
         try:
             # Format reading for Nightscout
-            ns_entry = {
+            ts = reading['timestamp']
+            ns_entry: Dict[str, Any] = {
                 'type': 'sgv',
-                'dateString': reading['timestamp'].isoformat(),
-                'date': int(reading['timestamp'].timestamp() * 1000),
+                'dateString': ts.isoformat(),
+                'date': int(ts.timestamp() * 1000),
                 'sgv': reading['value'],
                 'direction': reading['trend']
             }
@@ -37,7 +37,7 @@ class NightscoutConnector:
             print(f"Error pushing to Nightscout: {e}")
             return False
     
-    def get_latest_reading(self) -> Dict:
+    def get_latest_reading(self) -> Optional[Dict[str, Any]]:
         """Get latest reading from Nightscout"""
         try:
             url = f"{self.url}/api/v1/entries/sgv"
