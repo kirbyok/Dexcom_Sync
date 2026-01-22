@@ -1,6 +1,6 @@
 services:
   dexcom-sync:
-    image: ghcr.io/kirbyok/Dexcom_Sync:latest
+    image: ghcr.io/kirbyok/dexcom_sync:latest
     container_name: dexcom-sync
     env_file:
       - .env
