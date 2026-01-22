@@ -9,6 +9,7 @@ import sys
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any, Dict, List
 from logging.handlers import TimedRotatingFileHandler
 from dotenv import load_dotenv
 from dexcom_client import DexcomClient
@@ -67,7 +68,7 @@ class DexcomSync:
         if ns_url and ns_token:
             self.nightscout = NightscoutConnector(ns_url, ns_token)
     
-    def display_readings(self, readings: list):
+    def display_readings(self, readings: List[Dict[str, Any]]):
         """Display the last N readings in a nice format"""
         if not readings:
             logger.info("No readings found.")
@@ -78,9 +79,9 @@ class DexcomSync:
         logger.info("=" * 60)
         
         for i, reading in enumerate(readings, 1):
-            timestamp = reading['timestamp']
-            value = reading['value']
-            trend = reading['trend']
+            timestamp: datetime = reading['timestamp']
+            value: int = reading['value']
+            trend: str = reading['trend']
             
             # Format timestamp
             time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
@@ -126,7 +127,7 @@ class DexcomSync:
             else:
                 start_date = end_date - timedelta(hours=2)
             
-            readings = self.dexcom.get_glucose_readings(
+            readings: List[Dict[str, Any]] = self.dexcom.get_glucose_readings(
                 start_date=start_date,
                 end_date=end_date
             )

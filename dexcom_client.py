@@ -1,7 +1,7 @@
 import requests
 import os
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 class DexcomClient:
     """Client for interacting with Dexcom Share API (same as Nightscout)"""
@@ -106,7 +106,11 @@ class DexcomClient:
         self.session_id = None
         self.account_id = None
     
-    def get_glucose_readings(self, start_date: datetime = None, end_date: datetime = None) -> List[Dict]:
+    def get_glucose_readings(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
         """Fetch glucose readings from Dexcom Share API"""
         if not self.session_id:
             if not self.login():
@@ -123,7 +127,7 @@ class DexcomClient:
             minutes_ago = int((end_date - start_date).total_seconds() / 60)
             
             # Dexcom API expects: minutes (time window) and maxCount (number of records)
-            params = {
+            params: Dict[str, Any] = {
                 'sessionID': self.session_id,
                 'minutes': minutes_ago,
                 'maxCount': 288  # Max 288 readings (5 minute intervals for 24 hours)
@@ -136,7 +140,7 @@ class DexcomClient:
             data = response.json()
             
             # Parse readings
-            readings = []
+            readings: List[Dict[str, Any]] = []
             if data:
                 for record in data:
                     try:
@@ -174,11 +178,11 @@ class DexcomClient:
             print(f"Error fetching glucose readings: {e}")
             return []
     
-    def get_latest_glucose_reading(self) -> Optional[Dict]:
+    def get_latest_glucose_reading(self) -> Optional[Dict[str, Any]]:
         """Get the most recent glucose reading"""
         try:
             readings = self.get_glucose_readings(
-                start_date=datetime.utcnow() - timedelta(hours=1)
+                start_date=datetime.now(timezone.utc) - timedelta(hours=1)
             )
             if readings:
                 return readings[-1]  # Most recent is last
