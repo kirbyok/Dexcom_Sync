@@ -99,8 +99,12 @@ class DexcomSync:
         
         logger.info("=" * 60)
     
-    def sync(self):
-        """Sync Dexcom readings to configured destinations"""
+    def sync(self, days: int = 0):
+        """Sync Dexcom readings to configured destinations
+        
+        Args:
+            days: Number of days to backfill (0 = default 2 hours, 1-30 = historical)
+        """
         try:
             logger.info("Starting sync...")
             
@@ -113,8 +117,18 @@ class DexcomSync:
                 logger.info("[OK] Successfully authenticated with Dexcom")
             
             logger.info("Fetching glucose readings...")
+            
+            # Calculate date range
+            end_date = datetime.now(timezone.utc)
+            if days > 0:
+                start_date = end_date - timedelta(days=days)
+                logger.info(f"Backfilling {days} day(s) of data...")
+            else:
+                start_date = end_date - timedelta(hours=2)
+            
             readings = self.dexcom.get_glucose_readings(
-                start_date=datetime.now(timezone.utc) - timedelta(hours=2)
+                start_date=start_date,
+                end_date=end_date
             )
             
             if not readings:
@@ -170,8 +184,14 @@ def main():
         'action',
         nargs='?',
         default='once',
-        choices=['once', 'continuous', 'config'],
+        choices=['once', 'continuous', 'config', 'backfill'],
         help='Action to perform (default: once)'
+    )
+    parser.add_argument(
+        '--days',
+        type=int,
+        default=1,
+        help='Number of days to backfill (1-30, default: 1)'
     )
     
     args = parser.parse_args()
@@ -190,10 +210,18 @@ def main():
     
     if args.action == 'once':
         logger.info("Running one-time sync...")
-        success = sync.sync()
+        success = sync.sync(days=0)
         sys.exit(0 if success else 1)
     elif args.action == 'continuous':
         sync.run_continuous()
+    elif args.action == 'backfill':
+        # Validate days parameter
+        if args.days < 1 or args.days > 30:
+            logger.error("Days must be between 1 and 30")
+            sys.exit(1)
+        logger.info(f"Running backfill for {args.days} day(s)...")
+        success = sync.sync(days=args.days)
+        sys.exit(0 if success else 1)
 
 
 if __name__ == '__main__':
