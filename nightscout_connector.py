@@ -1,3 +1,4 @@
+import os
 import requests
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -8,6 +9,8 @@ class NightscoutConnector:
     def __init__(self, url: str, api_token: str):
         self.url = url.rstrip('/')
         self.api_token = api_token
+        # Allow overriding device name via env (fallback to DexSync)
+        self.device_name = os.getenv('DEXCOM_DEVICE_NAME', 'DexSync')
         self.session = requests.Session()
         self.session.headers.update({
             'api-secret': api_token,
@@ -24,8 +27,21 @@ class NightscoutConnector:
                 'dateString': ts.isoformat(),
                 'date': int(ts.timestamp() * 1000),
                 'sgv': reading['value'],
-                'direction': reading['trend']
+                'direction': reading['trend'],
+                'device': self.device_name
             }
+
+            # Optional fields when available from Dexcom
+            if reading.get('trend_rate') is not None:
+                ns_entry['trendRate'] = reading['trend_rate']
+            if reading.get('filtered') is not None:
+                ns_entry['filtered'] = reading['filtered']
+            if reading.get('unfiltered') is not None:
+                ns_entry['unfiltered'] = reading['unfiltered']
+            if reading.get('rssi') is not None:
+                ns_entry['rssi'] = reading['rssi']
+            if reading.get('noise') is not None:
+                ns_entry['noise'] = reading['noise']
             
             # POST to Nightscout
             url = f"{self.url}/api/v1/entries"
