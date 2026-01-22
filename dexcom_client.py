@@ -156,6 +156,9 @@ class DexcomClient:
                     except Exception as e:
                         print(f"Error parsing reading: {e}")
                         continue
+
+                # Ensure readings are sorted from oldest to newest
+                readings.sort(key=lambda r: r['timestamp'])
             
             return readings
             

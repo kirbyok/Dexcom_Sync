@@ -136,6 +136,24 @@ class DexcomSync:
                 return False
             
             logger.info(f"[OK] Retrieved {len(readings)} glucose readings")
+
+            # Data freshness diagnostics
+            now = datetime.now(timezone.utc)
+            oldest_ts = readings[0]['timestamp']
+            latest_ts = readings[-1]['timestamp']
+            oldest_age = int((now - oldest_ts).total_seconds() / 60)
+            latest_age = int((now - latest_ts).total_seconds() / 60)
+            logger.info(
+                f"Oldest reading age: {oldest_age} min (at {oldest_ts.strftime('%Y-%m-%d %H:%M:%S')})"
+            )
+            logger.info(
+                f"Latest reading age: {latest_age} min (at {latest_ts.strftime('%Y-%m-%d %H:%M:%S')})"
+            )
+            if latest_age > 15:
+                logger.warning(
+                    "⚠️  Latest Dexcom reading is older than 15 minutes. "
+                    "If the Dexcom app shows fresh data, the Share API may be delayed."
+                )
             
             # Display last 5 readings
             self.display_readings(readings[-5:])
