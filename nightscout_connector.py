@@ -11,7 +11,7 @@ class NightscoutConnector:
         self.api_token = api_token
         self.session = requests.Session()
         self.session.headers.update({
-            'Authorization': f'Bearer {api_token}',
+            'api-secret': api_token,
             'Content-Type': 'application/json'
         })
     
