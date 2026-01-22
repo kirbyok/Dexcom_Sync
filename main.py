@@ -192,6 +192,9 @@ class DexcomSync:
                 for reading in new_readings:
                     if self.nightscout.push_reading(reading):
                         success_count += 1
+                        logger.debug(
+                            f"Pushed: {reading['value']} mg/dL at {reading['timestamp'].strftime('%H:%M:%S')}"
+                        )
                 logger.info(f"[OK] Pushed {success_count}/{len(new_readings)} readings to Nightscout")
             else:
                 logger.debug("Nightscout not configured (set NIGHTSCOUT_URL and NIGHTSCOUT_API_TOKEN)")
@@ -272,4 +275,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 

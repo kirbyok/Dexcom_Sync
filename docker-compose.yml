@@ -1,6 +1,6 @@
 services:
   dexcom-sync:
-    image: ghcr.io/kirbyok/dexcom_sync:latest
+    build: .
     container_name: dexcom-sync
     env_file:
       - .env
@@ -10,7 +10,7 @@ services:
     command: ["python", "main.py", "continuous"]
   
   glooko-sync:
-    image: ghcr.io/kirbyok/dexcom_sync:latest
+    build: .
     container_name: glooko-sync
     env_file:
       - .env
@@ -18,3 +18,4 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     command: ["python", "glooko_main.py", "continuous"]
+
