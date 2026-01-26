@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   dexcom-sync:
     build: .
@@ -8,14 +10,54 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     command: ["python", "main.py", "continuous"]
+    # Security: read-only root filesystem
+    read_only: true
+    # Security: limit resource usage
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # Security: no privilege escalation
+    security_opt:
+      - no-new-privileges:true
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   
-  glooko-sync:
+  tandem-sync:
     build: .
-    container_name: glooko-sync
+    container_name: tandem-sync
     env_file:
       - .env
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
-    command: ["python", "glooko_main.py", "continuous"]
+    command: ["python", "tandem_main.py", "continuous"]
+    # Security: read-only root filesystem
+    read_only: true
+    # Security: limit resource usage
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # Security: no privilege escalation
+    security_opt:
+      - no-new-privileges:true
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 

@@ -179,3 +179,53 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Project-specific sensitive files
+logs/
+.env
+.env.local
+*.log
+*.lock
+
+# tconnectsync cache (contains authentication tokens)
+.config/tconnectsync/
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Python environment and cache
+venv/
+.venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Credentials and secrets
+.aws/
+.ssh/
+credentials.json
+secrets.json

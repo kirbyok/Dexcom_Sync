@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Glooko Sync - Sync Omnipod pump treatments from Glooko to Nightscout
+Tandem Sync - Sync Tandem pump treatments to Nightscout
 Runs independently from Dexcom CGM sync
 """
 
 import os
 import sys
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from logging.handlers import TimedRotatingFileHandler
 from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
-from glooko_client import GlookoClient
+from tandem_client import TandemClient
 from nightscout_treatments import NightscoutTreatments
 
 # Load environment variables
@@ -24,10 +24,10 @@ def setup_logging():
     log_dir = Path('logs')
     log_dir.mkdir(exist_ok=True)
     
-    log_file = log_dir / 'glooko_sync.log'
+    log_file = log_dir / 'tandem_sync.log'
     
     # Create logger
-    logger = logging.getLogger('glooko_sync')
+    logger = logging.getLogger('tandem_sync')
     logger.setLevel(logging.INFO)
     
     # Format: [YYYY-MM-DD HH:MM:SS] LEVEL: Message
@@ -55,25 +55,30 @@ def setup_logging():
 
 logger = setup_logging()
 
-class GlookoSync:
-    """Omnipod pump treatment sync manager"""
+class TandemSync:
+    """Tandem pump treatment sync manager"""
     
     def __init__(self):
-        # Check if Glooko is enabled
-        glooko_enabled = os.getenv('GLOOKO_SYNC_ENABLED', 'false').lower() == 'true'
-        if not glooko_enabled:
-            logger.error("Glooko sync is not enabled. Set GLOOKO_SYNC_ENABLED=true in .env")
+        # Check if Tandem sync is enabled
+        tandem_enabled = os.getenv('TCONNECT_SYNC_ENABLED', 'false').lower() == 'true'
+        if not tandem_enabled:
+            logger.error("Tandem sync is not enabled. Set TCONNECT_SYNC_ENABLED=true in .env")
             sys.exit(1)
         
-        # Initialize Glooko client
-        glooko_email = os.getenv('GLOOKO_EMAIL')
-        glooko_password = os.getenv('GLOOKO_PASSWORD')
+        # Initialize Tandem client
+        tconnect_username = os.getenv('TCONNECT_USERNAME')
+        tconnect_password = os.getenv('TCONNECT_PASSWORD')
         
-        if not glooko_email or not glooko_password:
-            logger.error("GLOOKO_EMAIL and GLOOKO_PASSWORD must be set in .env")
+        if not tconnect_username or not tconnect_password:
+            logger.error("TCONNECT_USERNAME and TCONNECT_PASSWORD must be set in .env")
             sys.exit(1)
         
-        self.glooko = GlookoClient()
+        self.tandem = TandemClient(tconnect_username, tconnect_password)
+        
+        # Authenticate with t:connect
+        if not self.tandem.authenticate():
+            logger.error("Failed to authenticate with t:connect")
+            sys.exit(1)
         
         # Initialize Nightscout treatments
         ns_url = os.getenv('NIGHTSCOUT_URL')
@@ -84,23 +89,25 @@ class GlookoSync:
             sys.exit(1)
         
         self.nightscout_treatments = NightscoutTreatments()
-        logger.info("Glooko Omnipod Sync initialized")
+        logger.info("Tandem Pump Sync initialized")
 
-    def _build_nightscout_profile(self, settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Convert Omnipod settings into a Nightscout profile payload."""
-        basal_profile: List[Dict[str, Any]] = settings.get('basal_profile', [])
-        if not basal_profile:
+    def _build_nightscout_profile(self, basal_segments: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Convert Tandem basal segments into a Nightscout profile payload."""
+        if not basal_segments:
             return None
 
-        profile_name: str = settings.get('profile_name', 'Omnipod')
-        timezone_name: str = settings.get('timezone', 'UTC')
+        profile_name: str = 'Tandem t:slim'
+        timezone_name: str = os.getenv('TIMEZONE', 'UTC')
 
-        # Nightscout expects sorted basal by start time
-        basal_entries = sorted(basal_profile, key=lambda b: b.get('start', '00:00'))
-        carb_ratios: List[Dict[str, Any]] = settings.get('carb_ratios', [])
-        sens_list: List[Dict[str, Any]] = settings.get('insulin_sensitivity', [])
-        target_low: List[Dict[str, Any]] = settings.get('target_low', [])
-        target_high: List[Dict[str, Any]] = settings.get('target_high', [])
+        # Convert basal segments to Nightscout format
+        basal_entries: List[Dict[str, Any]] = []
+        for segment in basal_segments:
+            entry: Dict[str, Any] = {
+                'start': segment.get('startTime', '00:00'),
+                'minutes': 0,
+                'rate': segment.get('rate', 0)
+            }
+            basal_entries.append(entry)
 
         profile: Dict[str, Any] = {
             'defaultProfile': profile_name,
@@ -109,54 +116,46 @@ class GlookoSync:
             'store': {
                 profile_name: {
                     'basal': basal_entries,
-                    'carbratio': carb_ratios,
-                    'sens': sens_list,
-                    'target_low': target_low,
-                    'target_high': target_high
+                    'carbratio': [],
+                    'sens': [],
+                    'target_low': [],
+                    'target_high': []
                 }
             }
         }
 
         return profile
     
-    def sync(self, days: int = 0):
-        """Sync Omnipod pump treatments from Glooko to Nightscout
+    def sync(self, hours: int = 24):
+        """Sync Tandem pump treatments to Nightscout
         
         Args:
-            days: Number of days to backfill (0 = default 24 hours, 1-30 = historical)
+            hours: Number of hours to sync (default: 24)
         """
         try:
             logger.info("=" * 60)
-            logger.info("Starting Omnipod treatment sync...")
+            logger.info("Starting Tandem pump treatment sync...")
             logger.info("=" * 60)
             
-            # Calculate date range
-            end_date = datetime.now(timezone.utc)
-            if days > 0:
-                start_date = end_date - timedelta(days=days)
-                logger.info(f"Backfilling {days} day(s) of Omnipod treatments...")
-            else:
-                start_date = end_date - timedelta(hours=24)
-                logger.info("Syncing last 24 hours of Omnipod treatments...")
+            logger.info(f"Syncing last {hours} hours of Tandem treatments...")
             
-            # Fetch treatments from Glooko
-            treatments: List[Dict[str, Any]] = self.glooko.get_pump_treatments(
-                start_date=start_date,
-                end_date=end_date
-            )
+            # Fetch therapy events from Tandem
+            treatments: List[Dict[str, Any]] = self.tandem.process_therapy_events()
             
             if not treatments:
-                logger.info("No Omnipod treatments found from Glooko")
+                logger.info("No Tandem pump treatments found from t:connect")
                 logger.info("=" * 60)
                 return True
             
-            logger.info(f"Retrieved {len(treatments)} Omnipod treatments from Glooko")
+            logger.info(f"Retrieved {len(treatments)} Tandem pump treatments")
             
             # Show summary of treatments
             bolus_count = sum(1 for t in treatments if 'Bolus' in t.get('eventType', ''))
-            basal_count = sum(1 for t in treatments if 'Basal' in t.get('eventType', ''))
-            logger.info(f"  Meal/Correction Boluses: {bolus_count}")
-            logger.info(f"  Temp Basals: {basal_count}")
+            meal_count = sum(1 for t in treatments if 'Carb' in t.get('eventType', ''))
+            correction_count = sum(1 for t in treatments if 'Correction' in t.get('eventType', ''))
+            logger.info(f"  Boluses: {bolus_count}")
+            logger.info(f"  Meals: {meal_count}")
+            logger.info(f"  Corrections: {correction_count}")
             
             # Check for duplicates - filter out treatments already in Nightscout
             logger.info("\nChecking for existing treatments in Nightscout...")
@@ -174,9 +173,10 @@ class GlookoSync:
                 # Filter to only new treatments
                 new_treatments: List[Dict[str, Any]] = []
                 for t in treatments:
-                    t_time = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
-                    if t_time > latest_ns_time:
-                        new_treatments.append(t)
+                    if 'created_at' in t:
+                        t_time = datetime.fromisoformat(t['created_at'].replace('Z', '+00:00'))
+                        if t_time > latest_ns_time:
+                            new_treatments.append(t)
                 
                 if not new_treatments:
                     logger.info("[OK] No new treatments to push (all already in Nightscout)")
@@ -188,20 +188,20 @@ class GlookoSync:
             else:
                 logger.info("No existing treatments in Nightscout, pushing all")
 
-            # Update Nightscout profile from Omnipod settings if available
-            settings = self.glooko.get_pump_settings()
-            if settings:
-                profile_payload = self._build_nightscout_profile(settings)
+            # Update Nightscout profile from Tandem basal segments if available
+            basal_segments = self.tandem.get_basal_rate_segments()
+            if basal_segments:
+                profile_payload = self._build_nightscout_profile(basal_segments)
                 if profile_payload:
-                    logger.info("Updating Nightscout profile with Omnipod basal/ratios/targets...")
+                    logger.info("Updating Nightscout profile with Tandem basal rates...")
                     if self.nightscout_treatments.update_profile(profile_payload):
-                        logger.info("[OK] Nightscout profile updated from Omnipod settings")
+                        logger.info("[OK] Nightscout profile updated from Tandem basal rates")
                     else:
                         logger.warning("Failed to update Nightscout profile")
                 else:
-                    logger.info("Omnipod settings missing basal profile; skipping profile update")
+                    logger.info("Tandem basal segments missing; skipping profile update")
             else:
-                logger.info("No Omnipod pump settings available; skipping profile update")
+                logger.info("No Tandem basal rate segments available; skipping profile update")
             
             # Show sample treatments
             if len(treatments) > 0:
@@ -215,31 +215,29 @@ class GlookoSync:
                         carbs = treatment.get('carbs', '')
                         carbs_str = f", {carbs}g carbs" if carbs else ""
                         logger.info(f"  {i}. {event_type}: {insulin}U{carbs_str} at {created_at}")
-                    elif 'Basal' in event_type:
-                        rate = treatment.get('absolute', 0)
-                        duration = treatment.get('duration', 0)
-                        logger.info(f"  {i}. {event_type}: {rate} U/hr for {duration} min at {created_at}")
+                    else:
+                        logger.info(f"  {i}. {event_type} at {created_at}")
             
             # Push to Nightscout
             logger.info("\nPushing treatments to Nightscout...")
             success_count, fail_count = self.nightscout_treatments.push_treatments(treatments)
             
             logger.info("=" * 60)
-            logger.info(f"[OK] Omnipod sync completed: {success_count} pushed, {fail_count} failed")
+            logger.info(f"[OK] Tandem sync completed: {success_count} pushed, {fail_count} failed")
             logger.info("=" * 60)
             return True
             
         except Exception as e:
-            logger.error(f"Omnipod treatment sync failed: {e}", exc_info=True)
+            logger.error(f"Tandem pump treatment sync failed: {e}", exc_info=True)
             logger.info("=" * 60)
             return False
     
     def run_continuous(self):
-        """Run continuous syncing for Omnipod treatments"""
+        """Run continuous syncing for Tandem pump treatments"""
         import time
         
         interval = int(os.getenv('SYNC_INTERVAL_MINUTES', '3')) * 60
-        logger.info(f"Starting continuous Omnipod sync every {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
+        logger.info(f"Starting continuous Tandem pump sync every {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
         logger.info("Press Ctrl+C to stop.\n")
         
         try:
@@ -248,54 +246,47 @@ class GlookoSync:
                 logger.info(f"\nWaiting {interval // 60} minutes until next sync...\n")
                 time.sleep(interval)
         except KeyboardInterrupt:
-            logger.info("\nOmnipod sync stopped by user")
+            logger.info("\nTandem pump sync stopped by user")
 
 
 def main():
     """Main entry point"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Glooko Sync - Sync Omnipod treatments to Nightscout')
+    parser = argparse.ArgumentParser(description='Tandem Sync - Sync Tandem pump treatments to Nightscout')
     parser.add_argument(
         'action',
         nargs='?',
         default='once',
-        choices=['once', 'continuous', 'config', 'backfill'],
+        choices=['once', 'continuous', 'config'],
         help='Action to perform (default: once)'
     )
     parser.add_argument(
-        '--days',
+        '--hours',
         type=int,
-        default=1,
-        help='Number of days to backfill (for backfill action, max 30)'
+        default=24,
+        help='Number of hours to sync (default: 24)'
     )
     
     args = parser.parse_args()
     
-    sync = GlookoSync()
+    sync = TandemSync()
     
     if args.action == 'config':
         logger.info("=" * 60)
-        logger.info("GLOOKO SYNC CONFIGURATION")
+        logger.info("TANDEM SYNC CONFIGURATION")
         logger.info("=" * 60)
-        logger.info(f"Glooko Email: {os.getenv('GLOOKO_EMAIL', 'NOT SET')}")
-        logger.info(f"Glooko Sync Enabled: {os.getenv('GLOOKO_SYNC_ENABLED', 'false')}")
+        logger.info(f"t:connect Username: {os.getenv('TCONNECT_USERNAME', 'NOT SET')}")
+        logger.info(f"Tandem Sync Enabled: {os.getenv('TCONNECT_SYNC_ENABLED', 'false')}")
         logger.info(f"Nightscout URL: {os.getenv('NIGHTSCOUT_URL', 'NOT SET')}")
         logger.info(f"Sync Interval: {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
         logger.info("=" * 60)
         
     elif args.action == 'once':
-        sync.sync()
+        sync.sync(hours=args.hours)
         
     elif args.action == 'continuous':
         sync.run_continuous()
-        
-    elif args.action == 'backfill':
-        if args.days < 1 or args.days > 30:
-            logger.error("Days must be between 1 and 30")
-            sys.exit(1)
-        logger.info(f"Backfilling {args.days} days of Omnipod treatments...")
-        sync.sync(days=args.days)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Dexcom Sync - Simple CLI tool to sync Dexcom glucose readings to Nightscout
-Note: Glooko Omnipod sync runs in a separate container (glooko_main.py)
+Note: Tandem pump sync runs in a separate container (tandem_main.py)
 """
 
 import os
@@ -212,7 +212,7 @@ class DexcomSync:
         
         interval = int(os.getenv('SYNC_INTERVAL_MINUTES', '3')) * 60
         logger.info(f"Starting continuous Dexcom CGM sync every {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
-        logger.info("Note: Glooko Omnipod sync runs in a separate container")
+        logger.info("Note: Tandem pump sync runs in a separate container")
         logger.info("Press Ctrl+C to stop.\n")
         
         try:
