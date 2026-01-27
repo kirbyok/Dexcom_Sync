@@ -10,7 +10,7 @@ COPY requirements.txt .
 # Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir --upgrade pip setuptools && \
+RUN pip install --no-cache-dir --upgrade pip==25.3 setuptools && \
     pip install --no-cache-dir -r requirements.txt
 
 # Final stage
@@ -38,8 +38,9 @@ WORKDIR /app
 # Copy application code
 COPY --chown=appuser:appuser . .
 
-# Create logs directory with proper permissions
-RUN mkdir -p logs && chown appuser:appuser logs
+# Create logs directory, upgrade pip (before switching to non-root)
+RUN mkdir -p logs && chown appuser:appuser logs && \
+    /opt/venv/bin/python -m pip install --no-cache-dir --upgrade pip==25.3
 
 # Switch to non-root user
 USER appuser

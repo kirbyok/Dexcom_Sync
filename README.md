@@ -2,7 +2,8 @@
 
 A minimal, command-line tool to fetch Dexcom glucose readings and optionally sync them to Nightscout.
 
-**Architecture:** Similar to Tconnectsync - simple, no database, no web server, configuration via `.env` file.
+**Architecture:** Simple, no database, no web server, configuration via `.env` file.
+
 ## Quick Start
 
 ```bash
@@ -39,31 +40,12 @@ DEXCOM_PASSWORD=your_password
 NIGHTSCOUT_URL=https://your-nightscout.herokuapp.com
 NIGHTSCOUT_API_TOKEN=your_api_token
 
-# Tandem pump sync (set TCONNECT_SYNC_ENABLED=true to enable)
-TCONNECT_USERNAME=your_tconnect_email@example.com
-TCONNECT_PASSWORD=your_tconnect_password
-TCONNECT_SYNC_ENABLED=false
-TCONNECT_DEVICE_NAME=Tandem
-# Feature toggles (all default true; set false to disable)
-TCONNECT_FEATURE_BASAL=true
-TCONNECT_FEATURE_BOLUS=true
-TCONNECT_FEATURE_PUMP_EVENTS=true
-TCONNECT_FEATURE_PROFILES=true
-
 # Sync interval (minutes) - for continuous mode
 SYNC_INTERVAL_MINUTES=5
 ```
 
-### Tandem feature toggles: when to change them
-- Set `TCONNECT_FEATURE_BOLUS=false` if you manually enter boluses/comments into Nightscout to avoid duplicates.
-- Set `TCONNECT_FEATURE_PUMP_EVENTS=true` (default) to see pump events like sleep/exercise mode, alarms, suspend/resume, cartridge/cannula fills.
-- Set `TCONNECT_FEATURE_PROFILES=true` (default) to let pump basal/profile updates flow into Nightscout; turn off if you manage profiles only in Nightscout.
-- Set `TCONNECT_FEATURE_BASAL=false` to skip basal/temp basal records if you only care about boluses.
-
 ### Backfill last 24 hours
-- Dexcom only: `python main.py once --days 1`
-- Tandem only: `python tandem_main.py once --hours 24`
-- Both (helper): `python backfill.py --source both --hours 24`
+- Dexcom: `python main.py once --days 1`
 
 ## Features
 
@@ -74,7 +56,6 @@ SYNC_INTERVAL_MINUTES=5
 - ✅ Optional Nightscout sync
 - ✅ Works with US and International Dexcom
 - ✅ Simple `.env` configuration
-- ✅ Tandem pump sync with selectable features (basal, bolus, pump events, profiles)
 
 ## Display Example
 
