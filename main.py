@@ -4,53 +4,56 @@ Dexcom Sync - Simple CLI tool to sync Dexcom glucose readings to Nightscout
 Note: Tandem pump sync runs in a separate container (tandem_main.py)
 """
 
-import os
 import sys
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import os
 from typing import Any, Dict, List
 from logging.handlers import TimedRotatingFileHandler
 from dotenv import load_dotenv
 from dexcom_client import DexcomClient
 from nightscout_connector import NightscoutConnector
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from explicit path
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # Setup logging
 def setup_logging():
-    """Configure logging with file rotation every 2 days"""
-    log_dir = Path('logs')
-    log_dir.mkdir(exist_ok=True)
-    
-    log_file = log_dir / 'dexcom_sync.log'
-    
-    # Create logger
+    """Configure logging; falls back to console if file is not writable."""
     logger = logging.getLogger('dexcom_sync')
+    if logger.handlers:
+        return logger
+
     logger.setLevel(logging.INFO)
-    
-    # Format: [YYYY-MM-DD HH:MM:SS] LEVEL: Message
+
     formatter = logging.Formatter(
         '[%(asctime)s] %(levelname)-8s: %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
-    # File handler with rotation every 2 days
-    file_handler = TimedRotatingFileHandler(
-        log_file,
-        when='midnight',
-        interval=2,
-        backupCount=10  # Keep 10 backup files
-    )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-    
-    # Console handler for real-time output
+
+    # Console handler is always available
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    
+
+    # File handler (best-effort); skips if not writable
+    log_dir = Path(os.getenv('LOG_DIR', '/app/logs'))
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / 'dexcom_sync.log'
+        file_handler = TimedRotatingFileHandler(
+            log_file,
+            when='midnight',
+            interval=2,
+            backupCount=10
+        )
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("File logging disabled: %s", exc)
+
     return logger
 
 logger = setup_logging()

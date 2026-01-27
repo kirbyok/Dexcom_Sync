@@ -26,7 +26,7 @@ COPY requirements.txt .
 RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
     /opt/venv/bin/pip install --no-cache-dir -r requirements.txt && \
-    # Remove pip and setuptools from runtime to reduce attack surface
+    # Remove pip, setuptools, and wheel from runtime to reduce attack surface
     /opt/venv/bin/pip uninstall -y pip setuptools wheel && \
     # Remove __pycache__ and .pyc files
     find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \

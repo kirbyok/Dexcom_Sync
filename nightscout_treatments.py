@@ -2,6 +2,7 @@ import requests
 import os
 from typing import Dict, Any, Optional
 import logging
+import hashlib
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,14 +16,21 @@ class NightscoutTreatments:
     
     def __init__(self):
         self.base_url = os.getenv('NIGHTSCOUT_URL', '').rstrip('/')
-        self.api_token = os.getenv('NIGHTSCOUT_API_TOKEN', '')
+        # Prefer NS_SECRET if set; otherwise use NIGHTSCOUT_API_TOKEN
+        secret_raw = os.getenv('NS_SECRET') or os.getenv('NIGHTSCOUT_API_TOKEN', '')
         
-        if not self.base_url or not self.api_token:
-            raise ValueError("NIGHTSCOUT_URL and NIGHTSCOUT_API_TOKEN must be set")
+        if not self.base_url or not secret_raw:
+            raise ValueError("NIGHTSCOUT_URL and NS_SECRET or NIGHTSCOUT_API_TOKEN must be set")
         
         self.session = requests.Session()
+        # Nightscout expects SHA1 hash unless a 40-char hex is already provided
+        raw_secret = secret_raw.strip()
+        if len(raw_secret) == 40 and all(c in '0123456789abcdef' for c in raw_secret.lower()):
+            api_secret = raw_secret
+        else:
+            api_secret = hashlib.sha1(raw_secret.encode()).hexdigest()
         self.session.headers.update({
-            'api-secret': self.api_token,
+            'api-secret': api_secret,
             'Content-Type': 'application/json'
         })
     
@@ -120,13 +128,21 @@ class NightscoutTreatments:
             return None
 
     def update_profile(self, profile: Dict[str, Any]) -> bool:
-        """Update Nightscout profile settings (basal, ratios, targets)."""
+        """Update Nightscout profile settings (basal, ratios, targets).
+        
+        Tries multiple authentication methods if Bearer token fails.
+        """
         try:
             url = f"{self.base_url}/api/v1/profile"
             response = self.session.post(url, json=profile, timeout=10)
+            
+            if response.status_code == 401:
+                logger.error("Nightscout profile update unauthorized (401); check NIGHTSCOUT_API_TOKEN or NS_SECRET")
+                return False
             response.raise_for_status()
             logger.info("Nightscout profile updated")
             return True
+            
         except Exception as e:
             logger.error(f"Error updating Nightscout profile: {e}")
             return False
