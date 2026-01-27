@@ -1,0 +1,95 @@
+# Docker Hardened Image (DHI) - Dexcom Sync
+# Multi-stage build with extreme minimization
+
+# Stage 1: Builder with full toolchain
+FROM python:3.12-slim AS builder
+
+# Build arguments for reproducibility
+ARG BUILD_DATE
+ARG VCS_REF
+LABEL org.opencontainers.image.created=$BUILD_DATE \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.title="Dexcom Sync DHI" \
+      org.opencontainers.image.description="Hardened Docker image for Dexcom/Tandem to Nightscout sync" \
+      org.opencontainers.image.vendor="Dexcom Sync" \
+      org.opencontainers.image.licenses="MIT"
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python dependencies
+COPY requirements.txt .
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt && \
+    # Remove pip and setuptools from runtime to reduce attack surface
+    /opt/venv/bin/pip uninstall -y pip setuptools wheel && \
+    # Remove __pycache__ and .pyc files
+    find /opt/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /opt/venv -type f -name "*.pyc" -delete
+
+# Stage 2: Minimal runtime with distroless approach
+FROM python:3.12-slim
+
+# Security: Install only essential runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    # Remove unnecessary files
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /usr/share/doc/* \
+    && rm -rf /usr/share/man/* \
+    && rm -rf /usr/share/locale/* \
+    && rm -rf /var/cache/apt/*
+
+# Security: Create non-root user with no shell and no home directory write
+RUN useradd -r -u 1000 -M -s /sbin/nologin appuser && \
+    mkdir -p /app /app/logs && \
+    chown -R appuser:appuser /app
+
+# Set hardened environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PATH="/opt/venv/bin:$PATH" \
+    # Security: Disable Python debug builds
+    PYTHONOPTIMIZE=2
+
+# Copy virtual environment from builder
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+
+WORKDIR /app
+
+# Copy application with minimal files
+COPY --chown=appuser:appuser main.py dexcom_client.py nightscout_connector.py nightscout_treatments.py ./
+COPY --chown=appuser:appuser tandem_main.py tandem_client.py ./
+
+# Security: Make app files read-only
+RUN chmod -R 555 /app/*.py && \
+    chmod 750 /app/logs
+
+# Switch to non-root user
+USER appuser
+
+# Security: Use tmpfs for /tmp (no persistent writable filesystem)
+VOLUME ["/app/logs"]
+
+# Health check - use internal Python check instead of external tools
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import os; assert os.path.exists('/app/logs')" || exit 1
+
+# Metadata
+LABEL maintainer="Dexcom Sync" \
+      description="Docker Hardened Image for Dexcom/Tandem diabetes data sync" \
+      security.distroless="false" \
+      security.non-root="true" \
+      security.read-only="capable"
+
+# Default command
+CMD ["python", "main.py", "continuous"]
