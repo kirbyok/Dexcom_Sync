@@ -30,40 +30,4 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-  
-  tandem-sync:
-    image: zbaize01/dexcom-sync:dhi
-    container_name: tandem-sync
-    env_file:
-      - .env
-    environment:
-      LOG_DIR: /app/logs
-      HOME: /app/logs
-      XDG_CACHE_HOME: /app/logs
-      XDG_CONFIG_HOME: /app/logs
-      TCONNECT_CACHE_DIR: /app/logs/.config/tconnectsync
-    volumes:
-      - ./logs:/app/logs
-    restart: unless-stopped
-    command: ["python", "tandem_main.py", "continuous"]
-    # Security: read-only root filesystem
-    read_only: true
-    # Security: limit resource usage
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-    # Security: no privilege escalation
-    security_opt:
-      - no-new-privileges:true
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 

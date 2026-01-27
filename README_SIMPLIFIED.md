@@ -2,7 +2,7 @@
 
 A lightweight command-line tool to fetch Dexcom glucose readings and sync them to Nightscout.
 
-Similar architecture to Tconnectsync - simple, minimal dependencies, configuration via `.env` file.
+Simple architecture - minimal dependencies, configuration via `.env` file.
 
 ## Installation
 
