@@ -130,7 +130,18 @@ python main.py continuous
 
 # View current configuration
 python main.py config
+
+# Backfill last 24h (Dexcom, Tandem, or both)
+python backfill.py --source dexcom --hours 24
+python backfill.py --source tandem --hours 24
+python backfill.py --source both --hours 24
 ```
+
+Feature toggles (pump sync):
+- Disable bolus sync to avoid duplicates if you log boluses manually: set `TCONNECT_FEATURE_BOLUS=false`.
+- Keep pump events on to see sleep/exercise modes, alarms, suspend/resume: `TCONNECT_FEATURE_PUMP_EVENTS=true` (default).
+- Disable profile updates if you manage profiles only in Nightscout: set `TCONNECT_FEATURE_PROFILES=false`.
+- Disable basal/temp basal records if you only care about boluses: set `TCONNECT_FEATURE_BASAL=false`.
 
 ### Quality Improvements
 

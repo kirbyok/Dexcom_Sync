@@ -43,6 +43,17 @@ DEXCOM_CLIENT_ID=your-client-id-from-dexcom
 DEXCOM_CLIENT_SECRET=your-client-secret-from-dexcom
 DEXCOM_REDIRECT_URI=http://localhost:5000/dexcom/callback
 
+# Tandem pump sync (optional)
+TCONNECT_USERNAME=your_tconnect_email@example.com
+TCONNECT_PASSWORD=your_tconnect_password
+TCONNECT_SYNC_ENABLED=false
+TCONNECT_DEVICE_NAME=Tandem
+# Feature toggles (default true; set to false to disable)
+TCONNECT_FEATURE_BASAL=true
+TCONNECT_FEATURE_BOLUS=true
+TCONNECT_FEATURE_PUMP_EVENTS=true
+TCONNECT_FEATURE_PROFILES=true
+
 # Generate these (run commands below)
 FLASK_SECRET_KEY=<run: python -c "import secrets; print(secrets.token_hex(32))">
 ENCRYPTION_KEY=<run: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
@@ -87,7 +98,18 @@ pip install -r requirements.txt
 
 # Run
 python app.py
+
+# Backfill last 24h (either or both sources)
+python backfill.py --source both --hours 24
+python backfill.py --source dexcom --hours 24
+python backfill.py --source tandem --hours 24
 ```
+
+### Tandem feature toggles: quick guidance
+- Turn off bolus sync if you log boluses manually in Nightscout: `TCONNECT_FEATURE_BOLUS=false`.
+- Leave pump events on to see sleep/exercise modes, alarms, suspend/resume: `TCONNECT_FEATURE_PUMP_EVENTS=true` (default).
+- Turn off profiles if you manage insulin profiles only in Nightscout: `TCONNECT_FEATURE_PROFILES=false`.
+- Turn off basal/temp basal if you only care about boluses: `TCONNECT_FEATURE_BASAL=false`.
 
 ## Step 4: Access Dashboard (1 minute)
 
