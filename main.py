@@ -3,7 +3,9 @@
 Dexcom Sync - Simple CLI tool to sync Dexcom glucose readings to Nightscout
 """
 
+import argparse
 import sys
+import time
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -65,8 +67,8 @@ class DexcomSync:
         self.nightscout = None
         
         # Initialize Nightscout for CGM data if configured
-        ns_url = os.getenv('NIGHTSCOUT_URL')
-        ns_token = os.getenv('NIGHTSCOUT_API_TOKEN')
+        ns_url = os.getenv('NIGHTSCOUT_URL') or os.getenv('NS_URL')
+        ns_token = os.getenv('NIGHTSCOUT_API_TOKEN') or os.getenv('NS_SECRET')
         if ns_url and ns_token:
             self.nightscout = NightscoutConnector(ns_url, ns_token)
             logger.info("Nightscout CGM connector initialized")
@@ -83,16 +85,16 @@ class DexcomSync:
         logger.info("DEXCOM GLUCOSE READINGS")
         logger.info("=" * 60)
         
+        now = datetime.now(timezone.utc)
         for i, reading in enumerate(readings, 1):
             timestamp: datetime = reading['timestamp']
             value: int = reading['value']
             trend: str = reading['trend']
-            
+
             # Format timestamp
             time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-            
+
             # Calculate time ago
-            now = datetime.now(timezone.utc)
             minutes_ago = int((now - timestamp).total_seconds() / 60)
             if minutes_ago < 1:
                 time_ago = "Just now"
@@ -143,12 +145,11 @@ class DexcomSync:
             
             logger.info(f"[OK] Retrieved {len(readings)} glucose readings")
 
-            # Data freshness diagnostics
-            now = datetime.now(timezone.utc)
+            # Data freshness diagnostics (use end_date as the consistent reference clock)
             oldest_ts = readings[0]['timestamp']
             latest_ts = readings[-1]['timestamp']
-            oldest_age = int((now - oldest_ts).total_seconds() / 60)
-            latest_age = int((now - latest_ts).total_seconds() / 60)
+            oldest_age = int((end_date - oldest_ts).total_seconds() / 60)
+            latest_age = int((end_date - latest_ts).total_seconds() / 60)
             logger.info(
                 f"Oldest reading age: {oldest_age} min (at {oldest_ts.strftime('%Y-%m-%d %H:%M:%S')})"
             )
@@ -210,25 +211,23 @@ class DexcomSync:
     
     def run_continuous(self):
         """Run continuous syncing for Dexcom CGM"""
-        import time
-        
         interval = int(os.getenv('SYNC_INTERVAL_MINUTES', '3')) * 60
         logger.info(f"Starting continuous Dexcom CGM sync every {os.getenv('SYNC_INTERVAL_MINUTES', '3')} minutes")
         logger.info("Press Ctrl+C to stop.\n")
-        
+
         try:
             while True:
+                start = time.monotonic()
                 self.sync()
-                logger.info(f"Waiting {interval // 60} minutes until next sync...\n")
-                time.sleep(interval)
+                sleep_time = max(0, interval - (time.monotonic() - start))
+                logger.info(f"Waiting {sleep_time:.0f}s until next sync...\n")
+                time.sleep(sleep_time)
         except KeyboardInterrupt:
             logger.info("\nSync stopped by user")
 
 
 def main():
     """Main entry point"""
-    import argparse
-    
     parser = argparse.ArgumentParser(description='Dexcom Sync - Sync Dexcom readings to Nightscout')
     parser.add_argument(
         'action',
@@ -253,8 +252,8 @@ def main():
         logger.info(f"  DEXCOM_EMAIL: {os.getenv('DEXCOM_EMAIL', 'NOT SET')}")
         logger.info(f"  DEXCOM_PASSWORD: {'SET' if os.getenv('DEXCOM_PASSWORD') else 'NOT SET'}")
         logger.info(f"  DEXCOM_USE_INTL: {os.getenv('DEXCOM_USE_INTL', 'false')}")
-        logger.info(f"  NIGHTSCOUT_URL: {os.getenv('NIGHTSCOUT_URL', 'NOT SET')}")
-        logger.info(f"  NIGHTSCOUT_API_TOKEN: {'SET' if os.getenv('NIGHTSCOUT_API_TOKEN') else 'NOT SET'}")
+        logger.info(f"  NIGHTSCOUT_URL: {os.getenv('NIGHTSCOUT_URL') or os.getenv('NS_URL', 'NOT SET')}")
+        logger.info(f"  NIGHTSCOUT_API_TOKEN/NS_SECRET: {'SET' if (os.getenv('NIGHTSCOUT_API_TOKEN') or os.getenv('NS_SECRET')) else 'NOT SET'}")
         logger.info(f"  SYNC_INTERVAL_MINUTES: {os.getenv('SYNC_INTERVAL_MINUTES', '3')}")
         return
     

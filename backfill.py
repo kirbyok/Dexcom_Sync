@@ -21,7 +21,6 @@ env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 from main import DexcomSync  # noqa: E402
-from tandem_main import TandemSync  # noqa: E402
 
 logger = logging.getLogger("backfill")
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)-8s: %(message)s')
@@ -35,6 +34,11 @@ def backfill_dexcom(hours: int) -> bool:
 
 
 def backfill_tandem(hours: int) -> bool:
+    try:
+        from tandem_main import TandemSync
+    except ImportError:
+        logger.error("tandem_main.py not found; Tandem backfill is not available")
+        return False
     logger.info("Starting Tandem backfill for %s hour(s)", hours)
     sync = TandemSync()
     return sync.sync(hours=hours)

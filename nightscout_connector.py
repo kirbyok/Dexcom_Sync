@@ -1,8 +1,11 @@
+import logging
 import os
 import requests
 from datetime import datetime
 from hashlib import sha1
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 class NightscoutConnector:
     """Connector for Nightscout API"""
@@ -10,18 +13,23 @@ class NightscoutConnector:
     def __init__(self, url: str, api_token: str):
         self.url = url.rstrip('/')
         raw_secret = api_token.strip()
-        # Nightscout expects a SHA1 hash; if the provided token is not already a 40-char hex hash, hash it.
-        if len(raw_secret) == 40 and all(c in '0123456789abcdef' for c in raw_secret.lower()):
-            self.api_secret = raw_secret
+        # Role-based access tokens (e.g. "dexcom-abc123") use ?token= query param.
+        # Plain API secrets (passwords) are SHA1-hashed into the api-secret header.
+        if '-' in raw_secret and not (len(raw_secret) == 40 and all(c in '0123456789abcdef' for c in raw_secret.lower())):
+            self.role_token = raw_secret
+            self.api_secret = None
         else:
-            self.api_secret = sha1(raw_secret.encode('utf-8')).hexdigest()
+            self.role_token = None
+            if len(raw_secret) == 40 and all(c in '0123456789abcdef' for c in raw_secret.lower()):
+                self.api_secret = raw_secret
+            else:
+                self.api_secret = sha1(raw_secret.encode('utf-8')).hexdigest()
         # Allow overriding device name via env (fallback to Dexcom)
         self.device_name = os.getenv('DEXCOM_DEVICE_NAME', 'Dexcom')
         self.session = requests.Session()
-        self.session.headers.update({
-            'api-secret': self.api_secret,
-            'Content-Type': 'application/json'
-        })
+        self.session.headers.update({'Content-Type': 'application/json'})
+        if self.api_secret:
+            self.session.headers.update({'api-secret': self.api_secret})
     
     def push_reading(self, reading: Dict[str, Any]) -> bool:
         """Push a glucose reading to Nightscout"""
@@ -51,43 +59,38 @@ class NightscoutConnector:
             
             # POST to Nightscout
             url = f"{self.url}/api/v1/entries"
-            response = self.session.post(url, json=ns_entry, timeout=10)
+            params = {'token': self.role_token} if self.role_token else {}
+            response = self.session.post(url, json=ns_entry, params=params, timeout=10)
             response.raise_for_status()
             
-            # Debug: log what we sent
-            print(f"[PUSH] SGV: {ns_entry['sgv']}, Device: {ns_entry.get('device', 'MISSING')}, Time: {ns_entry['dateString']}")
-            
+            logger.debug("[PUSH] SGV: %s, Device: %s, Time: %s",
+                         ns_entry['sgv'], ns_entry.get('device', 'MISSING'), ns_entry['dateString'])
             return True
         except Exception as e:
-            print(f"Error pushing to Nightscout: {e}")
+            logger.error("Error pushing to Nightscout: %s", e)
             return False
     
     def get_latest_reading(self) -> Optional[Dict[str, Any]]:
         """Get latest reading from Nightscout"""
         try:
-            url = f"{self.url}/api/v1/entries/sgv"
-            response = self.session.get(url, params={'count': 1}, timeout=10)
+            url = f"{self.url}/api/v1/entries/sgv.json"
+            params: Dict[str, Any] = {'count': 1}
+            if self.role_token:
+                params['token'] = self.role_token
+            response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
-            
-            # The endpoint returns tab-separated values with quoted fields
-            # Format: "2026-01-22T06:47:50.329Z"  1769064470329  109  "Flat"  "unknown"
-            text = response.text.strip()
-            
-            # Split by whitespace (including tabs), removing quotes
-            parts = [p.strip('"') for p in text.split() if p]
-            if len(parts) >= 3:
-                date_str = parts[0]
-                sgv = int(parts[2])
-                direction = parts[3] if len(parts) > 3 else 'None'
-                
+
+            entries = response.json()
+            if entries:
+                entry = entries[0]
                 return {
-                    'timestamp': datetime.fromisoformat(date_str.replace('Z', '+00:00')),
-                    'value': sgv,
-                    'trend': direction
+                    'timestamp': datetime.fromisoformat(entry['dateString'].replace('Z', '+00:00')),
+                    'value': entry['sgv'],
+                    'trend': entry.get('direction', 'None')
                 }
             return None
         except Exception as e:
-            print(f"Error getting latest reading from Nightscout: {e}")
+            logger.error("Error getting latest reading from Nightscout: %s", e)
             return None
 
 

@@ -1,10 +1,9 @@
 import requests
 import os
+from hashlib import sha1
 from typing import Dict, Any, Optional
 import logging
-import hashlib
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class NightscoutTreatments:
@@ -28,7 +27,7 @@ class NightscoutTreatments:
         if len(raw_secret) == 40 and all(c in '0123456789abcdef' for c in raw_secret.lower()):
             api_secret = raw_secret
         else:
-            api_secret = hashlib.sha1(raw_secret.encode()).hexdigest()
+            api_secret = sha1(raw_secret.encode('utf-8')).hexdigest()
         self.session.headers.update({
             'api-secret': api_secret,
             'Content-Type': 'application/json'

@@ -67,8 +67,7 @@ COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 WORKDIR /app
 
 # Copy application with minimal files
-COPY --chown=appuser:appuser main.py dexcom_client.py nightscout_connector.py nightscout_treatments.py ./
-COPY --chown=appuser:appuser tandem_main.py tandem_client.py ./
+COPY --chown=appuser:appuser main.py dexcom_client.py nightscout_connector.py nightscout_treatments.py backfill.py ./
 
 # Security: Make app files read-only
 RUN chmod -R 555 /app/*.py && \
