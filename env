@@ -1,17 +1,17 @@
 # Dexcom Configuration
 DEXCOM_EMAIL=
-DEXCOM_PHONE=+14056551665
-DEXCOM_PASSWORD=EWpT2eLDxbF3m8YM9aHk
+DEXCOM_PHONE=
+DEXCOM_PASSWORD=
 DEXCOM_USE_INTL=false
 DEXCOM_DEVICE_NAME=Dexcom
 
 # Nightscout Configuration (optional)
-NIGHTSCOUT_URL=https://kirby1.tx.nightscoutpro.com/
-NIGHTSCOUT_API_TOKEN=dexsync-b863ace5d5af6e96
+NIGHTSCOUT_URL=
+NIGHTSCOUT_API_TOKEN=
 
 # Tandem Diabetes tconnectsync Configuration (for pump data)
-TCONNECT_USERNAME=zane.okc@gmail.com
-TCONNECT_PASSWORD=Fendoj-4gaqra-ziwwes
+TCONNECT_USERNAME=
+TCONNECT_PASSWORD=
 TCONNECT_SYNC_ENABLED=ture
 TCONNECT_DEVICE_NAME=Tandem
 
