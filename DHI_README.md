@@ -1,7 +1,7 @@
 # Docker Hardened Image (DHI) - Deployment Guide
 
 ## Overview
-The Docker Hardened Image (DHI) provides maximum security hardening for the Dexcom/Tandem Nightscout sync service with an extremely minimal attack surface.
+The Docker Hardened Image (DHI) provides maximum security hardening for the Dexcom Nightscout sync service with an extremely minimal attack surface.
 
 ## Security Features
 
@@ -58,19 +58,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  tandem-sync:
-    image: zbaize01/dexcom-sync:dhi
-    container_name: tandem-sync
-    env_file:
-      - .env
-    volumes:
-      - ./logs:/app/logs
-    command: ["python", "tandem_main.py"]
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    restart: unless-stopped
 ```
 
 ### Running DHI Directly
@@ -84,17 +71,6 @@ docker run -d \
   --read-only \
   --restart unless-stopped \
   zbaize01/dexcom-sync:dhi
-
-# Tandem Pump Sync
-docker run -d \
-  --name tandem-sync \
-  --env-file .env \
-  -v $(pwd)/logs:/app/logs \
-  --security-opt no-new-privileges:true \
-  --read-only \
-  --restart unless-stopped \
-  zbaize01/dexcom-sync:dhi \
-  python tandem_main.py
 ```
 
 ## Comparison: Standard vs DHI

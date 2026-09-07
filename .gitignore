@@ -187,9 +187,6 @@ logs/
 *.log
 *.lock
 
-# tconnectsync cache (contains authentication tokens)
-.config/tconnectsync/
-
 # IDE specific
 .vscode/
 .idea/

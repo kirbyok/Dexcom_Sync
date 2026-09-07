@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """
-Backfill helper to sync the last N hours from Dexcom (CGM) and/or Tandem (pump) to Nightscout.
+Backfill helper to sync the last N hours from Dexcom (CGM) to Nightscout.
 
 Usage examples:
-  python backfill.py --source both --hours 24
-  python backfill.py --source dexcom --hours 24
-  python backfill.py --source tandem --hours 24
+  python backfill.py --hours 24
 """
 
 import math
 import argparse
 import logging
 from pathlib import Path
-from typing import List
 
 from dotenv import load_dotenv
 
@@ -33,25 +30,8 @@ def backfill_dexcom(hours: int) -> bool:
     return DexcomSync().sync(days=days)
 
 
-def backfill_tandem(hours: int) -> bool:
-    try:
-        from tandem_main import TandemSync
-    except ImportError:
-        logger.error("tandem_main.py not found; Tandem backfill is not available")
-        return False
-    logger.info("Starting Tandem backfill for %s hour(s)", hours)
-    sync = TandemSync()
-    return sync.sync(hours=hours)
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Backfill last N hours from Dexcom and/or Tandem")
-    parser.add_argument(
-        "--source",
-        choices=["both", "dexcom", "tandem"],
-        default="both",
-        help="Select which source(s) to backfill",
-    )
+    parser = argparse.ArgumentParser(description="Backfill last N hours from Dexcom")
     parser.add_argument(
         "--hours",
         type=int,
@@ -60,17 +40,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    ok_results: List[bool] = []
-
-    if args.source in ("both", "dexcom"):
-        ok_results.append(backfill_dexcom(args.hours))
-    if args.source in ("both", "tandem"):
-        ok_results.append(backfill_tandem(args.hours))
-
-    if all(ok_results):
+    if backfill_dexcom(args.hours):
         logger.info("Backfill completed successfully")
     else:
-        logger.warning("Backfill finished with some errors; check logs above")
+        logger.warning("Backfill finished with errors; check logs above")
 
 
 if __name__ == "__main__":

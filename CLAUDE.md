@@ -16,9 +16,7 @@ python main.py config            # Show current configuration
 python main.py backfill --days N # Backfill N days of historical data
 
 # Backfill utility
-python backfill.py --source dexcom --hours 24
-python backfill.py --source tandem --hours 24  # Tandem not yet implemented
-python backfill.py --source both --hours 24
+python backfill.py --hours 24
 
 # Docker
 docker compose up -d
@@ -38,8 +36,7 @@ docker push zbaize01/dexcom-sync:latest && docker push zbaize01/dexcom-sync:dhi
 - `main.py` — `DexcomSync` class; CLI entry point with `sync()`, `display_readings()`, `run_continuous()`; file-rotated logging; reads `NIGHTSCOUT_URL`/`NS_URL` and `NIGHTSCOUT_API_TOKEN`/`NS_SECRET`
 - `dexcom_client.py` — `DexcomClient`; 2-step Dexcom Share API auth (authenticate → login by account ID → fetch readings); US/International server selection; auto-retry on session expiry; dynamic maxCount scaling
 - `nightscout_connector.py` — `NightscoutConnector`; pushes SGV entries to `/api/v1/entries`; auto-detects auth type: role tokens (`role-xxx`) use `?token=` query param, plain API secrets use SHA1-hashed `api-secret` header
-- `nightscout_treatments.py` — `NightscoutTreatments`; pushes bolus/basal/pump events to `/api/v1/treatments`
-- `backfill.py` — Backfill utility; Tandem import is lazy (fails gracefully if `tandem_main.py` is absent)
+- `backfill.py` — Backfill utility; syncs the last N hours from Dexcom
 
 **Data flow:**
 
@@ -47,7 +44,6 @@ docker push zbaize01/dexcom-sync:latest && docker push zbaize01/dexcom-sync:dhi
 Dexcom Share API (username/password, not OAuth)
   └─ DexcomClient → GlucoseReading dicts
        └─ NightscoutConnector → /api/v1/entries (CGM)
-       └─ NightscoutTreatments → /api/v1/treatments (pump)
 ```
 
 **GlucoseReading dict shape:** `timestamp` (UTC-aware datetime), `value` (mg/dL int), `trend` (string like `'FortyFiveUp'`), `unit`, plus optional `trend_rate`, `filtered`, `unfiltered`, `rssi`, `noise`.
@@ -76,7 +72,3 @@ The DHI image uses a read-only root filesystem — file logging is disabled by d
 ## Datetime Handling
 
 All datetimes must be timezone-aware UTC (`timezone.utc`). Never use naive datetimes or `datetime.utcnow()`.
-
-## Known Issues
-
-- `tandem_main.py` does not exist — Tandem backfill is not implemented. `backfill.py` fails gracefully with an error message rather than crashing at import.

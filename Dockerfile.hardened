@@ -10,7 +10,7 @@ ARG VCS_REF
 LABEL org.opencontainers.image.created=$BUILD_DATE \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.title="Dexcom Sync DHI" \
-      org.opencontainers.image.description="Hardened Docker image for Dexcom/Tandem to Nightscout sync" \
+      org.opencontainers.image.description="Hardened Docker image for Dexcom to Nightscout sync" \
       org.opencontainers.image.vendor="Dexcom Sync" \
       org.opencontainers.image.licenses="MIT"
 
@@ -67,7 +67,7 @@ COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 WORKDIR /app
 
 # Copy application with minimal files
-COPY --chown=appuser:appuser main.py dexcom_client.py nightscout_connector.py nightscout_treatments.py backfill.py ./
+COPY --chown=appuser:appuser main.py dexcom_client.py nightscout_connector.py backfill.py ./
 
 # Security: Make app files read-only
 RUN chmod -R 555 /app/*.py && \
@@ -85,7 +85,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Metadata
 LABEL maintainer="Dexcom Sync" \
-      description="Docker Hardened Image for Dexcom/Tandem diabetes data sync" \
+      description="Docker Hardened Image for Dexcom diabetes data sync" \
       security.distroless="false" \
       security.non-root="true" \
       security.read-only="capable"
