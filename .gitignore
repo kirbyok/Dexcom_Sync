@@ -129,6 +129,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
 .venv
 env/
 venv/
@@ -173,8 +174,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Cursor  
-#  Cursor is an AI-powered code editor.`.cursorignore` specifies files/directories to 
+# Cursor
+#  Cursor is an AI-powered code editor.`.cursorignore` specifies files/directories to
 #  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
@@ -182,9 +183,6 @@ cython_debug/
 
 # Project-specific sensitive files
 logs/
-.env
-.env.local
-*.log
 *.lock
 
 # IDE specific
@@ -198,28 +196,8 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Python environment and cache
-venv/
-.venv/
-ENV/
-env/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
-
 # Docker
-.dockerignore
 docker-compose.override.yml
-
-# Test coverage
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
 
 # Credentials and secrets
 .aws/

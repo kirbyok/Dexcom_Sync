@@ -7,7 +7,9 @@ __pycache__/
 .git/
 .gitignore
 .github/
+.claude/
 .env
+.env.example
 .env.local
 *.log
 logs/
@@ -24,15 +26,6 @@ build/
 .vscode/
 .idea/
 .cursorignore
-README*.md
-CONTRIBUTING.md
-DOCKER.md
-QUICKSTART.md
-PROJECT_OVERVIEW.md
+*.md
 LICENSE
-CLEANUP_SUMMARY.md
-TEST_RESULTS.md
 Dexcom_Sync.code-workspace
-docker-compose.override.yml
-.git
-.github
